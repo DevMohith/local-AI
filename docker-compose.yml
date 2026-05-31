@@ -1,0 +1,69 @@
+# three containers
+
+# llama-a : Llama 3 (8b)
+# llama-b : Mistral (7B)
+# app : FastAPI and react
+
+# HOW TO USE:
+#   First time:   docker compose up        (downloads ~10 GB, once only)
+#   Every time:   docker compose up        (ready in ~15 seconds)
+#   Stop:         Ctrl+C  or  docker compose down
+# delete models and volumes:  docker compose down -v 
+#   Rebuild app:  docker compose build app 
+
+
+services:
+ 
+  # ── Llama 3 8B — general purpose documents ──────────────────────────────────
+  llama-a:
+    build: .
+    entrypoint: ["/entrypoint.sh", "llama"]
+    environment:
+      MODEL_PATH:    /models/llama3-8b-q4.gguf
+      MODEL_PORT:    "8081"
+      MODEL_URL:     "https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf"
+      CONTEXT_SIZE:  "4096"
+      CPU_THREADS:   "4"
+    volumes:
+      - docai-models:/models
+    networks:
+      - docai-net
+    restart: unless-stopped
+    healthcheck:
+      test:         ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval:     20s
+      timeout:      10s
+      retries:      15
+      start_period: 120s
+
+  # ── Web app: FastAPI + React ─────────────────────────────────────────────────
+  app:
+    build: .
+    entrypoint: ["/entrypoint.sh", "app"]
+    environment:
+      PORT:         "8080"
+      LLAMA_A_URL:  "http://llama-a:8081"
+      LLAMA_B_URL:  "http://llama-b:8082"
+    ports:
+      - "8080:8080"
+    networks:
+      - docai-net
+    depends_on:
+      llama-a:
+        condition: service_healthy
+      llama-b:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+# =============================================================================
+volumes:
+  # Models live here permanently — survive container restarts
+  # Only deleted if you run: docker compose down -v  (don't do that!)
+  docai-models:
+    driver: local
+ 
+networks:
+  # Private network — containers talk to each other only
+  docai-net:
+    driver: bridge

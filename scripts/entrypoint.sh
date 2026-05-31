@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -euo pipefail
 MODE="${1:-app}"
 echo "[DocAI] mode: $MODE"
@@ -33,12 +34,11 @@ if [ "$MODE" = "llama" ]; then
         --cont-batching \
         --log-disable
 
-
 elif [ "$MODE" = "app" ]; then
     PORT="${PORT:-8080}"
     exec python -m uvicorn backend.main:app \
         --host 0.0.0.0 --port "$PORT" --workers 2 --no-access-log
- 
+
 else
     echo "Unknown MODE: $MODE"
     exit 1
